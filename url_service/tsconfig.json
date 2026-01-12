@@ -15,7 +15,7 @@
     "moduleResolution": "node",
     "sourceMap": true,
     "baseUrl": "./",
-    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "typeRoots": ["./node_modules/@types", "src/shared/types"],
     "paths": {
       "@/*": ["src/*"]
     }

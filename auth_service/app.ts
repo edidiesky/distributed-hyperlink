@@ -42,11 +42,11 @@ app.use((req, res, next) => {
 
 /** HEALTH CHECK */
 app.get("/health", (_req, res) => {
-  res.json({ status: "Url route is Fine!" });
+  res.json({ status: "Authentication route is Fine!" });
 });
 
 /** ROUTES */
-app.use("/api/v1/urls", urlRoute);
+app.use("/api/v1/auth", urlRoute);
 
 /**
  * @description Metrics endpoint for my Prometheus server
@@ -55,9 +55,9 @@ app.get("/metrics", async (req, res) => {
   try {
     res.set("Content-Type", UrlRegistry.contentType);
     res.end(await UrlRegistry.metrics());
-    logger.info("Url Metrics has been scraped successfully!");
+    logger.info("Authentication Metrics has been scraped successfully!");
   } catch (error) {
-    logger.error("Url Metrics scraping error:", { error });
+    logger.error("Authentication Metrics scraping error:", { error });
     res.status(SERVER_ERROR_STATUS_CODE).end();
   }
 });

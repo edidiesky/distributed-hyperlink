@@ -2,7 +2,7 @@ import { app } from "./app";
 import { errorHandler, NotFound } from "./shared/middleware/error-handler";
 const PORT = process.env.PORT;
 import logger from "./shared/logger";
-import redisClient from "./infrastructure/cache/redis";
+import redisClient from "./infrastructure/cache/redis.client";
 import { trackError, serverHealthGauge } from "./shared/metrics";
 import { connectProducer, disconnectProducer } from "./messaging/producer";
 import { connectConsumer, disconnectConsumer } from "./messaging/consumer";

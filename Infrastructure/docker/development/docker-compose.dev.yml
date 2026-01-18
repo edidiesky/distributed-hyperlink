@@ -1,0 +1,108 @@
+networks:
+  citus-net:
+    driver: bridge
+
+services:
+  coordinator:
+    container_name: citus_coordinator
+    image: citusdata/citus:13.0.3
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:         
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-citus_dev}
+    volumes:
+      - coordinator-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - citus-net
+  worker-1:
+    container_name: citus_worker_1
+    image: citusdata/citus:13.0.3
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-citus_dev}  
+      
+    hostname: worker-1
+    volumes:
+      - worker1-data:/var/lib/postgresql/data
+      - ./wait-for-coordinator.sh:/wait-for-coordinator.sh
+      - ./register-worker.sh:/register-worker.sh
+    command: >
+      bash -c "
+        echo 'coordinator:5432:citus_dev:postgres:${POSTGRES_PASSWORD}' > /root/.pgpass &&
+        chmod 0600 /root/.pgpass &&
+        chmod +x /wait-for-coordinator.sh /register-worker.sh &&
+        
+        # Start PostgreSQL in background
+        docker-entrypoint.sh postgres &
+        
+        # Wait for local PostgreSQL to be ready
+        until pg_isready -h localhost -p 5432 -U postgres -t 3; do
+          echo 'Waiting for local PostgreSQL...'
+          sleep 2
+        done &&
+        
+        # Now register with coordinator
+        /wait-for-coordinator.sh &&
+        /register-worker.sh &&
+        
+        # Keep container running (PostgreSQL already started in background)
+        wait
+      "
+    networks:
+      - citus-net
+
+  worker-2:
+    container_name: citus_worker_2
+    image: citusdata/citus:13.0.3
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-citus_dev}  
+    hostname: worker-2
+    volumes:
+      - worker2-data:/var/lib/postgresql/data
+      - ./wait-for-coordinator.sh:/wait-for-coordinator.sh
+      - ./register-worker.sh:/register-worker.sh
+    command: >
+      bash -c "
+        echo 'coordinator:5432:citus_dev:postgres:${POSTGRES_PASSWORD}' > /root/.pgpass &&
+        chmod 0600 /root/.pgpass &&
+        chmod +x /wait-for-coordinator.sh /register-worker.sh &&
+        
+        # Start PostgreSQL in background
+        docker-entrypoint.sh postgres &
+        
+        # Wait for local PostgreSQL to be ready
+        until pg_isready -h localhost -p 5432 -U postgres -t 3; do
+          echo 'Waiting for local PostgreSQL...'
+          sleep 2
+        done &&
+        
+        # Now register with coordinator
+        /wait-for-coordinator.sh &&
+        /register-worker.sh &&
+        
+        # Keep container running
+        wait
+      "
+    networks:
+      - citus-net
+volumes:
+  coordinator-data:
+  worker1-data:
+  worker2-data:

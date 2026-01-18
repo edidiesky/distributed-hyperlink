@@ -1,10 +1,7 @@
 import Redis from "ioredis";
 import dotenv from "dotenv";
 import logger from "../../shared/logger";
-
-
 dotenv.config();
-
 
 const IO_REDIS_URL = process.env.IO_REDIS_URL || "redis://localhost:6379";
 

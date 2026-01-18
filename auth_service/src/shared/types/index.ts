@@ -43,3 +43,23 @@ export interface IURL {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface Config {
+  env: string;
+  database: {
+    host: string;
+    port: number;
+    name: string;
+    user: string;
+    password: string;
+  };
+  jwt: {
+    secret: string;
+    accessExpiry: string;
+    refreshExpiry: string;
+  };
+  server: {
+    port: number;
+    apiPrefix: string;
+  };
+}

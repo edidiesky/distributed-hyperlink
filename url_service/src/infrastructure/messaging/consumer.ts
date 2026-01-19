@@ -1,8 +1,8 @@
 import { Kafka, Consumer, EachMessagePayload } from "kafkajs";
-import logger from "../utils/logger";
 import { urlTopic } from "./topics";
-import { URL_CONSUMER_TOPICS } from "../constants";
 import { sendURLMessage } from "./producer";
+import logger from "@/shared/logger";
+import { URL_CONSUMER_TOPICS } from "@/shared/constants";
 
 const kafka = new Kafka({
   clientId: "URL_Service",

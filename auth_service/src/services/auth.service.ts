@@ -1,11 +1,13 @@
 
 import bcrypt from 'bcrypt';
 import logger from '../shared/logger';
-import { LoginRequestDTO } from '@/infrastructure/database/models/dtos/auth.dto';
-import { CreateUserInternalDTO } from '@/infrastructure/database/models/dtos/internal.dto';
-import { UserRepository } from '@/repository/auth.repository';
-import { User } from '@/infrastructure/database/models/user.model';
-import { TokenPair } from '@/infrastructure/database/models/dtos/auth-response.dto';
+import { LoginRequestDTO } from '../infrastructure/database/models/dtos/auth.dto';
+import { CreateUserInternalDTO } from '../infrastructure/database/models/dtos/internal.dto';
+import { UserRepository } from '../repository/auth.repository';
+import { User } from '../infrastructure/database/models/user.model';
+import { TokenPair } from '../infrastructure/database/models/dtos/auth-response.dto';
+import { TokenService } from './token.service';
+import { AppError } from '../shared/errors/AppError';
 
 export class AuthService {
   private userRepo: UserRepository;
@@ -16,17 +18,21 @@ export class AuthService {
     this.userRepo = new UserRepository();
     this.tokenService = new TokenService();
   }
+  
 
   async register(userData: CreateUserInternalDTO): Promise<{ user: Partial<User>; tokens: TokenPair }> {
-    // Validate email format
+
     if (!this.isValidEmail(userData.email)) {
-      throw new Error('Invalid email format');
+      throw AppError.badRequest('Invalid email format');
+    }
+    if (userData.password.length < 8) {
+      throw AppError.badRequest('Password must be at least 8 characters');
     }
 
-    // Check if user exists
-    const existingUser = await this.userRepo.findByEmail(userData.email);
-    if (existingUser) {
-      throw new Error('Email already registered');
+    // Check exiting user
+    const existing = await this.userRepo.findByEmail(userData.email);
+    if (existing) {
+      throw AppError.conflict('Email already registered', { email: userData.email });
     }
 
     // Hash password
@@ -43,54 +49,49 @@ export class AuthService {
 
     logger.info('User registered successfully', { userId: user.id, email: user.email });
 
-    // Return user without password_hash
-    const { password_hash, ...userWithoutPassword } = user;
-    return { user: userWithoutPassword, tokens };
+    const { password_hash, ...safeUser } = user;
+    return { user: safeUser, tokens };
   }
 
   async login(credentials: LoginRequestDTO): Promise<{ user: Partial<User>; tokens: TokenPair }> {
     const user = await this.userRepo.findByEmail(credentials.email);
 
     if (!user) {
-      throw new Error('Invalid credentials');
+      throw AppError.unauthenticated('Invalid credentials');
     }
 
     if (!user.is_active) {
-      throw new Error('Account is deactivated');
+      throw AppError.unauthorized('Account is deactivated');
     }
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(credentials.password, user.password_hash);
-    
-    if (!isPasswordValid) {
+    const isValid = await bcrypt.compare(credentials.password, user.password_hash);
+    if (!isValid) {
       logger.warn('Failed login attempt', { email: credentials.email });
-      throw new Error('Invalid credentials');
+      throw AppError.unauthenticated('Invalid credentials');
     }
 
-    // Update last login
     await this.userRepo.updateLastLogin(user.id);
 
-    // Generate tokens
+    // Generate new tokens 
     const tokens = await this.tokenService.generateTokenPair(user.id, user.email);
 
-    logger.info('User logged in successfully', { userId: user.id, email: user.email });
+    logger.info('User logged in successfully', { userId: user.id, email: credentials.email });
 
-    const { password_hash, ...userWithoutPassword } = user;
-    return { user: userWithoutPassword, tokens };
+    const { password_hash, ...safeUser } = user;
+    return { user: safeUser, tokens };
   }
 
   async refreshToken(refreshToken: string): Promise<TokenPair> {
     const payload = await this.tokenService.verifyRefreshToken(refreshToken);
+
+
     const user = await this.userRepo.findById(payload.userId);
     
     if (!user || !user.is_active) {
       throw new Error('User not found or inactive');
     }
-
-    // Revoke old refresh token
     await this.tokenService.revokeToken(payload.userId, refreshToken);
 
-    // Generate new token pair
     const tokens = await this.tokenService.generateTokenPair(user.id, user.email);
 
     logger.info('Tokens refreshed', { userId: user.id });
@@ -122,3 +123,4 @@ export class AuthService {
     return emailRegex.test(email);
   }
 }
+

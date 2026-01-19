@@ -1,8 +1,8 @@
+import logger from "../../shared/logger";
 import { Kafka, Partitioners, logLevel, CompressionTypes } from "kafkajs";
-import logger from "../utils/logger";
 
 const kafka = new Kafka({
-  clientId: "URL_Service",
+  clientId: "Auth_Service",
   brokers: ["kafka-1:9092", "kafka-2:9093", "kafka-3:9094"],
   logLevel: logLevel.ERROR,
   retry: {
@@ -26,7 +26,7 @@ export async function connectProducer() {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       await producer.connect();
-      logger.info("URL producer connected");
+      logger.info("Auth producer connected");
       return;
     } catch (error) {
       if (attempt === retries - 1) {
@@ -39,17 +39,17 @@ export async function connectProducer() {
 }
 
 /**
- * Send URL message with proper partitioning
+ * Send Auth message with proper partitioning
  * Handler created here guarantees ordering for that customer's transactions
  */
-export async function sendURLMessage(
+export async function sendAuthMessage(
   topic: string,
   data: any,
   key?: string
 ) {
   try {
     const partitionKey =
-      key || data.url;
+      key || data.Auth;
     const result = await producer.send({
       topic,
       messages: [
@@ -57,7 +57,7 @@ export async function sendURLMessage(
           key: partitionKey,
           value: JSON.stringify(data),
           headers: {
-            service: "URL-service",
+            service: "Auth-service",
             timestamp: Date.now().toString(),
             "correlation-id": data.sagaId || data.transactionId || "null",
           },
@@ -84,5 +84,5 @@ export async function sendURLMessage(
 
 export async function disconnectProducer() {
   await producer.disconnect();
-  logger.info("URL producer disconnected");
+  logger.info("Auth producer disconnected");
 }

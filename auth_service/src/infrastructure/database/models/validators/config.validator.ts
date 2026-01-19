@@ -20,4 +20,5 @@ export const envSchema = Joi.object({
   // Server
   PORT: Joi.number().default(4001),
   API_PREFIX: Joi.string().default("/api/v1"),
+  WEB_ORIGIN: Joi.string().uri().required(),
 }).unknown();

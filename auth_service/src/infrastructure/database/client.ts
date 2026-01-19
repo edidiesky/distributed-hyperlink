@@ -21,7 +21,7 @@ db.on('error', (err, client) => {
     error: err.message,
     stack: err.stack,
   });
-  // In production: trigger alert + graceful shutdown
+  // trigger alert + graceful shutdown
 });
 
 (async () => {

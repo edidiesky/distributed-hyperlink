@@ -1,4 +1,31 @@
 
+
+export interface LoginRequestDTO {
+  email: string;
+  password: string;
+}
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface JWTPayload {
+  userId: string;
+  email: string;
+  type: 'access' | 'refresh';
+  iat?: number;
+  exp?: number;
+}
+
+export interface CreateUserInternalDTO {
+  email: string;
+  password: string;    
+  first_name: string;
+  last_name: string;
+}
+
+
 /**
  * DTO for user registration
  */

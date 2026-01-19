@@ -1,5 +1,5 @@
 networks:
-  citus-net:
+  hashlink:
     driver: bridge
 
 services:
@@ -21,10 +21,16 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - citus-net
+      - hashlink
   worker-1:
     container_name: citus_worker_1
     image: citusdata/citus:13.0.3
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-citus_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     depends_on:
       coordinator:
         condition: service_healthy
@@ -61,11 +67,17 @@ services:
         wait
       "
     networks:
-      - citus-net
+      - hashlink
 
   worker-2:
     container_name: citus_worker_2
     image: citusdata/citus:13.0.3
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-citus_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     depends_on:
       coordinator:
         condition: service_healthy
@@ -101,7 +113,32 @@ services:
         wait
       "
     networks:
-      - citus-net
+      - hashlink
+
+  auth:
+    build:
+      context: ../../../auth_service
+      dockerfile: Dockerfile
+    container_name: auth
+    env_file:
+      - ../../../auth_service/.env
+    networks:
+      - hashlink
+    ports:
+      - "4001:4001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://auth:4001/health"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      coordinator:
+        condition: service_started
+      worker-1:
+        condition: service_started
+      worker-2:
+        condition: service_started
 volumes:
   coordinator-data:
   worker1-data:

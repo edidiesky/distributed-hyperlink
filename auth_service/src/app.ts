@@ -2,21 +2,17 @@ import helmet from "helmet";
 import dotenv from "dotenv";
 dotenv.config();
 import morgan from "morgan";
-import urlRoute from "./routes/url.route";
+import authRoute from "./route/auth.routes";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { errorHandler, NotFound } from "./shared/middleware/error-handler";
-import { reqReplyTime, UrlRegistry } from "./shared/metrics";
+import { reqReplyTime, authRegistry } from "./shared/metrics";
 import logger from "./shared/logger";
-import { SERVER_ERROR_STATUS_CODE } from "./shared/constants";
+import { INTERNAL_SERVER_ERROR } from "./shared/constants";
 
 const app = express();
 
-/** MIDDLEWARE */
-if (!process.env.WEB_ORIGIN) {
-  throw new Error("No WEB_ORIGIN");
-}
 app.use(helmet());
 app.use(
   cors({
@@ -42,23 +38,23 @@ app.use((req, res, next) => {
 
 /** HEALTH CHECK */
 app.get("/health", (_req, res) => {
-  res.json({ status: "Url route is Fine!" });
+  res.json({ status: "Auth route is Fine!" });
 });
 
 /** ROUTES */
-app.use("/api/v1/urls", urlRoute);
+app.use("/api/v1/auth", authRoute);
 
 /**
  * @description Metrics endpoint for my Prometheus server
  */
 app.get("/metrics", async (req, res) => {
   try {
-    res.set("Content-Type", UrlRegistry.contentType);
-    res.end(await UrlRegistry.metrics());
-    logger.info("Url Metrics has been scraped successfully!");
+    res.set("Content-Type", authRegistry.contentType);
+    res.end(await authRegistry.metrics());
+    logger.info("Auth Metrics has been scraped successfully!");
   } catch (error) {
-    logger.error("Url Metrics scraping error:", { error });
-    res.status(SERVER_ERROR_STATUS_CODE).end();
+    logger.error("Auth Metrics scraping error:", { error });
+    res.status(INTERNAL_SERVER_ERROR).end();
   }
 });
 

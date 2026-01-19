@@ -32,8 +32,7 @@ class RedisClient {
   async connect() {
     if(!this.isConnected) {
       await this.connect()
-      logger.info("Redis has been connected!")
-
+      logger.info("Redis has been connected succesfully!")
     }
   }
 
@@ -58,7 +57,7 @@ class RedisClient {
   async revokeRefreshToken(userId: string, token: string): Promise<void> {
     const key = `refresh_token:${userId}:${token}`;
     await this.client.del(key);
-    logger.info('Refresh token revoked', { userId });
+    logger.info('Refresh token has just been revoked', { userId });
   }
 
   async revokeAllUserTokens(userId: string): Promise<void> {
@@ -67,13 +66,14 @@ class RedisClient {
     
     if (keys.length > 0) {
       await this.client.del(keys);
-      logger.info('All user tokens revoked', { userId, count: keys.length });
+      logger.info('All user tokens has been revoked', { userId, count: keys.length });
     }
   }
 
   async blacklistAccessToken(token: string, expirySeconds: number): Promise<void> {
     const key = `blacklist:${token}`;
     await this.client.setex(key, expirySeconds, '1');
+    logger.info("The access token has been blacklisted!")
   }
 
   async isAccessTokenBlacklisted(token: string): Promise<boolean> {

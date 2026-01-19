@@ -1,6 +1,6 @@
 export interface CreateUserInternalDTO {
   email: string;
-  password_hash: string;
+  password: string;
   first_name: string;
   last_name: string;
 }
@@ -9,13 +9,11 @@ export interface CreateUserInternalDTO {
  * JWT Payload structure
  */
 export interface JWTPayload {
-  sub: string;
+  userId: string;
   email: string;
   type: 'access' | 'refresh';
-  iat: number;
-  exp: number;
-  iss: string; 
-  aud: string; 
+  iat?: number;
+  exp?: number;
 }
 
 /**

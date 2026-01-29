@@ -12,21 +12,22 @@ const startServer = async () => {
   const startTime = process.hrtime();
   logger.info(`Starting ${config.env} server on port ${PORT}...`);
   try {
-
-
     const validatedConfig = validateConfig(); 
     logger.info(`Starting ${validatedConfig.env} server...`);
 
+    // Wait for Redis connection with timeout
+    logger.info('Waiting for Redis connection...');
+    await redisClient.waitForConnection(10000); // 10 second timeout
     
+    // Verify Redis is working
     await redisClient.getClient().ping();
     logger.info('Redis connection established successfully');
 
-    // postgre health check.
+    // PostgreSQL health check
     const dbHealthy = await db.query('SELECT 1');
     if (dbHealthy.rowCount === 1) {
-      logger.info('PostgreSQL connection healthy');
+      logger.info('PostgreSQL connection pool initialized successfully');
     }
-
 
     const server = app.listen(PORT, () => {
       const duration = process.hrtime(startTime);
@@ -39,20 +40,20 @@ const startServer = async () => {
       serverHealthGauge.set(1);
     });
 
-
     const gracefulShutdown = async (signal: string) => {
       logger.info(`Received ${signal} - shutting down gracefully...`);
 
       const shutdownStart = process.hrtime();
 
       try {
-
+        // Close HTTP server
         await new Promise<void>((resolve) => server.close(() => resolve()));
         logger.info('HTTP server closed');
 
-        // Disconnecting Redis
+        // Disconnect Redis
         await redisClient.disconnect();
         logger.info('Redis disconnected');
+        
         const shutdownDuration = process.hrtime(shutdownStart);
         const seconds = shutdownDuration[0] + shutdownDuration[1] / 1e9;
 
@@ -64,7 +65,6 @@ const startServer = async () => {
         process.exit(1);
       }
     };
-
 
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));

@@ -19,6 +19,9 @@ RUN npx tsc
 FROM node:18-alpine
 
 WORKDIR /app
+RUN addgroup -g 1001 nodejs && \
+    adduser -S nodejs -u 1001 -G nodejs
+    
 RUN apk add --no-cache curl
 # Copy package files
 COPY package.json package-lock.json ./

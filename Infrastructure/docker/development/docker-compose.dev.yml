@@ -1,8 +1,29 @@
 networks:
   hashlink:
     driver: bridge
+    name: hashlink
 
 services:
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis
+    command: redis-server --save 60 1 --loglevel warning --bind 0.0.0.0
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      hashlink:
+        aliases:
+          - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+      
   coordinator:
     container_name: citus_coordinator
     image: citusdata/citus:13.0.3
@@ -13,15 +34,18 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-citus_dev}
+      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - coordinator-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-citus_dev}"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 30s
     networks:
       - hashlink
+      
   worker-1:
     container_name: citus_worker_1
     image: citusdata/citus:13.0.3
@@ -31,14 +55,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 30s
     depends_on:
       coordinator:
         condition: service_healthy
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-citus_dev}  
-      
+      POSTGRES_DB: ${POSTGRES_DB:-citus_dev}
+      POSTGRES_HOST_AUTH_METHOD: trust
     hostname: worker-1
     volumes:
       - worker1-data:/var/lib/postgresql/data
@@ -46,10 +71,6 @@ services:
       - ./register-worker.sh:/register-worker.sh
     command: >
       bash -c "
-        echo 'coordinator:5432:citus_dev:postgres:${POSTGRES_PASSWORD}' > /root/.pgpass &&
-        chmod 0600 /root/.pgpass &&
-        chmod +x /wait-for-coordinator.sh /register-worker.sh &&
-        
         # Start PostgreSQL in background
         docker-entrypoint.sh postgres &
         
@@ -78,13 +99,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 30s
     depends_on:
       coordinator:
         condition: service_healthy
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-citus_dev}  
+      POSTGRES_DB: ${POSTGRES_DB:-citus_dev}
+      POSTGRES_HOST_AUTH_METHOD: trust
     hostname: worker-2
     volumes:
       - worker2-data:/var/lib/postgresql/data
@@ -92,10 +115,6 @@ services:
       - ./register-worker.sh:/register-worker.sh
     command: >
       bash -c "
-        echo 'coordinator:5432:citus_dev:postgres:${POSTGRES_PASSWORD}' > /root/.pgpass &&
-        chmod 0600 /root/.pgpass &&
-        chmod +x /wait-for-coordinator.sh /register-worker.sh &&
-        
         # Start PostgreSQL in background
         docker-entrypoint.sh postgres &
         
@@ -122,24 +141,32 @@ services:
     container_name: auth
     env_file:
       - ../../../auth_service/.env
+    environment:
+      IO_REDIS_URL: "redis://redis:6379"
+      NODE_ENV: ${NODE_ENV:-development}
     networks:
       - hashlink
     ports:
       - "4001:4001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://auth:4001/health"]
-      interval: 1m30s
+      test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
+      interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
     depends_on:
+      redis:
+        condition: service_healthy
       coordinator:
-        condition: service_started
+        condition: service_healthy
       worker-1:
-        condition: service_started
+        condition: service_healthy
       worker-2:
-        condition: service_started
+        condition: service_healthy
+    restart: unless-stopped
+        
 volumes:
   coordinator-data:
   worker1-data:
   worker2-data:
+  redis-data:

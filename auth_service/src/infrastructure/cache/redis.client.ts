@@ -6,16 +6,23 @@ dotenv.config();
 const IO_REDIS_URL = process.env.IO_REDIS_URL || "redis://localhost:6379";
 
 class RedisClient {
-  private client;
+  private client: Redis;
   private isConnected: boolean = false;
+  
   constructor() {
     this.client = new Redis(IO_REDIS_URL, {
       retryStrategy(times) {
+        if (times > 10) {
+          logger.error(`Max Redis retry attempts (${times}) reached`);
+          return null; // Stop retrying after 10 attempts
+        }
         const delay = Math.min(times * 500, 2000);
         logger.error(`Retrying Redis connection (${times})...`);
         return delay;
       },
       maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+      lazyConnect: false, // Auto-connect on instantiation
     });
 
     this.client.on("error", (err) => {
@@ -24,24 +31,56 @@ class RedisClient {
     });
 
     this.client.on("connect", () => {
+      logger.info("Redis connection established");
+    });
+
+    this.client.on("ready", () => {
       this.isConnected = true;
       logger.info("Successfully connected to Redis at", IO_REDIS_URL);
     });
+
+    this.client.on("close", () => {
+      this.isConnected = false;
+      logger.warn("Redis connection closed");
+    });
+
+    this.client.on("reconnecting", () => {
+      logger.info("Attempting to reconnect to Redis...");
+    });
   }
 
-  async connect() {
-    if(!this.isConnected) {
-      await this.connect()
-      logger.info("Redis has been connected succesfully!")
+  async waitForConnection(timeoutMs: number = 10000): Promise<void> {
+    if (this.isConnected) {
+      return;
+    }
+
+    const startTime = Date.now();
+    
+    while (!this.isConnected && Date.now() - startTime < timeoutMs) {
+      try {
+        await this.client.ping();
+        this.isConnected = true;
+        logger.info("Redis connection verified via ping");
+        return;
+      } catch (error) {
+        logger.debug("Waiting for Redis connection...");
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    if (!this.isConnected) {
+      throw new Error(`Redis connection timeout after ${timeoutMs}ms`);
     }
   }
 
   async disconnect() {
-    if(this.isConnected) {
-      await this.client.quit()
-      logger.info("Redis has been disconnected!")
+    if (this.isConnected) {
+      await this.client.quit();
+      this.isConnected = false;
+      logger.info("Redis has been disconnected!");
     }
   }
+
   async storeRefreshToken(userId: string, token: string, expirySeconds: number): Promise<void> {
     const key = `refresh_token:${userId}:${token}`;
     await this.client.setex(key, expirySeconds, token);
@@ -73,7 +112,7 @@ class RedisClient {
   async blacklistAccessToken(token: string, expirySeconds: number): Promise<void> {
     const key = `blacklist:${token}`;
     await this.client.setex(key, expirySeconds, '1');
-    logger.info("The access token has been blacklisted!")
+    logger.info("The access token has been blacklisted!");
   }
 
   async isAccessTokenBlacklisted(token: string): Promise<boolean> {
@@ -84,6 +123,10 @@ class RedisClient {
 
   getClient() {
     return this.client;
+  }
+
+  isReady(): boolean {
+    return this.isConnected;
   }
 }
 

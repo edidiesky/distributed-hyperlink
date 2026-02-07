@@ -23,6 +23,16 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: redis-insight
+    ports:
+      - "8001:8001"
+    networks:
+      - redis-net
+    volumes:
+      - redis-insight-data:/db
+    restart: unless-stopped
       
   coordinator:
     container_name: citus_coordinator
@@ -170,3 +180,4 @@ volumes:
   worker1-data:
   worker2-data:
   redis-data:
+  redis-insight-data:

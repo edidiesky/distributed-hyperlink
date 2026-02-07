@@ -2,7 +2,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { redisClient } from '../infrastructure/cache/redis.client';
-import logger from '../shared/logger';
 import { TokenPair } from '../infrastructure/database/models/dtos/auth-response.dto';
 import { JWTPayload } from '../infrastructure/database/models/dtos/internal.dto';
 import { AppError } from '../shared/errors/AppError';
@@ -22,8 +21,6 @@ export class TokenService {
   async generateTokenPair(userId: string, email: string): Promise<TokenPair> {
     const accessToken = this.generateAccessToken(userId, email);
     const refreshToken = this.generateRefreshToken(userId, email);
-
-    // Storing refresh token in Redis
     const refreshExpSeconds = this.parseExpiry(this.refreshTokenExpiry);
     await redisClient.storeRefreshToken(userId, refreshToken, refreshExpSeconds);
 

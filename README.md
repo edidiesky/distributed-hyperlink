@@ -356,7 +356,6 @@ distributed-hyperlink/
 
 ## How to use it
 
-
 ### Prerequisites
 1. Docker Engine 24.x+ and Docker Compose 2.x+
 1. Node.js 20.x+ (for local development without Docker)
